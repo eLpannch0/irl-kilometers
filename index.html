@@ -1,45 +1,67 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body {
+html, body {
   margin: 0;
+  padding: 0;
+  background: transparent;
   overflow: hidden;
   font-family: Arial, sans-serif;
 }
 
-#kmBox {
+#bar {
   position: fixed;
-  top: 20px;
-  right: 20px;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 20px;
+  align-items: center;
+
   background: rgba(0,0,0,0.6);
   backdrop-filter: blur(8px);
-  border-radius: 12px;
-  padding: 10px 14px;
+  border-radius: 20px;
+
+  padding: 6px 14px;
   color: white;
-  text-align: center;
-  min-width: 90px;
+  font-size: 14px;
+
   box-shadow: 0 0 10px rgba(0,0,0,0.4);
 }
 
-#label {
-  font-size: 10px;
-  opacity: 0.7;
+.block {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-#km {
-  font-size: 18px;
+.label {
+  opacity: 0.7;
+  font-size: 11px;
+}
+
+.value {
   font-weight: bold;
+  font-size: 16px;
 }
 </style>
 </head>
 
 <body>
 
-<div id="kmBox">
-  <div id="label">KM</div>
-  <div id="km">0.00</div>
+<div id="bar">
+  <div class="block">
+    <span class="label">KM</span>
+    <span class="value" id="km">0.00</span>
+  </div>
+
+  <div class="block">
+    <span class="label">SPEED</span>
+    <span class="value" id="speed">0</span> km/h
+  </div>
 </div>
 
 <script>
@@ -64,12 +86,25 @@ function getDistance(p1, p2) {
 }
 
 navigator.geolocation.watchPosition(pos => {
-  if (lastPos) {
-    const dist = getDistance(lastPos.coords, pos.coords);
-    totalDistance += dist;
-    document.getElementById("km").innerText = totalDistance.toFixed(2);
+  const coords = pos.coords;
+
+  // скорость (м/с → км/ч)
+  if (coords.speed !== null) {
+    let speedKmh = coords.speed * 3.6;
+    document.getElementById("speed").innerText = speedKmh.toFixed(1);
   }
+
+  // километраж
+  if (lastPos) {
+    const dist = getDistance(lastPos.coords, coords);
+    if (dist > 0.001) { // фильтр от шума GPS
+      totalDistance += dist;
+      document.getElementById("km").innerText = totalDistance.toFixed(2);
+    }
+  }
+
   lastPos = pos;
+
 }, err => console.log(err), {
   enableHighAccuracy: true,
   maximumAge: 1000
