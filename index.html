@@ -33,13 +33,43 @@
       white-space: nowrap;
     }
 
-    .dot {
-      width: 8px;
-      height: 8px;
+    /* 🔵 ПУЛЬСИРУЮЩАЯ ИКОНКА */
+    .pulse {
+      position: relative;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: #4fc3ff;
-      box-shadow: 0 0 12px #4fc3ff;
+      box-shadow: 0 0 8px #4fc3ff;
       flex: 0 0 auto;
+    }
+
+    .pulse::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 2px solid #4fc3ff;
+      transform: translate(-50%, -50%);
+      animation: pulseRing 1.6s infinite;
+      opacity: 0.7;
+    }
+
+    @keyframes pulseRing {
+      0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.7;
+      }
+      70% {
+        transform: translate(-50%, -50%) scale(2.2);
+        opacity: 0;
+      }
+      100% {
+        opacity: 0;
+      }
     }
 
     .item {
@@ -57,6 +87,7 @@
       min-width: 18px;
     }
 
+    /* 🔵 НЕОНОВЫЕ ЦИФРЫ */
     .num {
       font-size: 26px;
       font-weight: 900;
@@ -95,7 +126,7 @@
 <body>
 
 <div id="bar">
-  <span class="dot"></span>
+  <span class="pulse"></span>
 
   <div class="item">
     <span class="label">km</span>
@@ -153,12 +184,8 @@
   }
 
   function getAdaptiveSettings(speedKmh) {
-    if (speedKmh < 7) {
-      return { minSpeed: 1.0, smooth: 0.45 };
-    }
-    if (speedKmh < 18) {
-      return { minSpeed: 2.0, smooth: 0.35 };
-    }
+    if (speedKmh < 7) return { minSpeed: 1.0, smooth: 0.45 };
+    if (speedKmh < 18) return { minSpeed: 2.0, smooth: 0.35 };
     return { minSpeed: 5.0, smooth: 0.25 };
   }
 
