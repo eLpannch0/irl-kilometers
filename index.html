@@ -33,43 +33,62 @@
       white-space: nowrap;
     }
 
-    /* 🔵 ПУЛЬСИРУЮЩАЯ ИКОНКА */
-    .pulse {
-      position: relative;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #4fc3ff;
-      box-shadow: 0 0 8px #4fc3ff;
+    /* ⚡ НЕОНОВАЯ МОЛНИЯ */
+    .bolt-wrap {
+      width: 18px;
+      height: 22px;
       flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    .pulse::after {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      border: 2px solid #4fc3ff;
-      transform: translate(-50%, -50%);
-      animation: pulseRing 1.6s infinite;
-      opacity: 0.7;
+    .bolt {
+      width: 18px;
+      height: 22px;
+      display: block;
+      filter:
+        drop-shadow(0 0 2px rgba(255,255,255,0.25))
+        drop-shadow(0 0 5px rgba(0,212,255,0.35))
+        drop-shadow(0 0 10px rgba(183,0,255,0.35));
+      transition: filter 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
+      opacity: 0.75;
     }
 
-    @keyframes pulseRing {
-      0% {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 0.7;
-      }
-      70% {
-        transform: translate(-50%, -50%) scale(2.2);
-        opacity: 0;
-      }
-      100% {
-        opacity: 0;
-      }
+    .bolt path {
+      stroke: url(#boltGradient);
+      stroke-width: 2.6;
+      fill: none;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+      stroke-dasharray: 120;
+      stroke-dashoffset: 0;
+      animation: boltFlow 2.2s linear infinite;
+    }
+
+    /* спокойный режим */
+    .bolt.idle {
+      filter:
+        drop-shadow(0 0 2px rgba(255,255,255,0.20))
+        drop-shadow(0 0 4px rgba(79,195,255,0.25));
+      opacity: 0.55;
+      transform: scale(0.96);
+    }
+
+    /* активный режим при ходьбе/езде */
+    .bolt.active {
+      filter:
+        drop-shadow(0 0 3px rgba(255,255,255,0.30))
+        drop-shadow(0 0 8px rgba(0,212,255,0.65))
+        drop-shadow(0 0 14px rgba(125,92,255,0.55))
+        drop-shadow(0 0 18px rgba(255,111,0,0.45));
+      opacity: 1;
+      transform: scale(1.04);
+    }
+
+    @keyframes boltFlow {
+      0%   { stroke-dashoffset: 120; }
+      100% { stroke-dashoffset: 0; }
     }
 
     .item {
@@ -87,7 +106,6 @@
       min-width: 18px;
     }
 
-    /* 🔵 НЕОНОВЫЕ ЦИФРЫ */
     .num {
       font-size: 26px;
       font-weight: 900;
@@ -126,7 +144,32 @@
 <body>
 
 <div id="bar">
-  <span class="pulse"></span>
+  <span class="bolt-wrap">
+    <svg class="bolt idle" id="boltIcon" viewBox="0 0 24 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="boltGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"  stop-color="#00e5ff">
+            <animate attributeName="stop-color"
+              values="#00e5ff;#4fc3ff;#8a2eff;#ff3cac;#ff8a00;#00e5ff"
+              dur="2.4s" repeatCount="indefinite" />
+          </stop>
+          <stop offset="45%" stop-color="#8a2eff">
+            <animate attributeName="stop-color"
+              values="#8a2eff;#ff3cac;#ff8a00;#00e5ff;#8a2eff"
+              dur="2.4s" repeatCount="indefinite" />
+          </stop>
+          <stop offset="100%" stop-color="#ff8a00">
+            <animate attributeName="stop-color"
+              values="#ff8a00;#ff3cac;#8a2eff;#00e5ff;#ff8a00"
+              dur="2.4s" repeatCount="indefinite" />
+          </stop>
+        </linearGradient>
+      </defs>
+
+      <!-- форма молнии -->
+      <path d="M13 2 L6.5 15 H11 L8.5 28 L18 12.5 H13.5 L17 2 Z"></path>
+    </svg>
+  </span>
 
   <div class="item">
     <span class="label">km</span>
@@ -145,6 +188,7 @@
 <script>
   const distanceValueEl = document.getElementById('distanceValue');
   const speedEl = document.getElementById('speed');
+  const boltIcon = document.getElementById('boltIcon');
 
   let totalMeters = 0;
   let lastPoint = null;
@@ -189,9 +233,20 @@
     return { minSpeed: 5.0, smooth: 0.25 };
   }
 
+  function updateBoltState() {
+    if (smoothSpeed >= 1.0) {
+      boltIcon.classList.remove('idle');
+      boltIcon.classList.add('active');
+    } else {
+      boltIcon.classList.remove('active');
+      boltIcon.classList.add('idle');
+    }
+  }
+
   function updateUI() {
     distanceValueEl.textContent = (totalMeters / 1000).toFixed(3);
     speedEl.textContent = smoothSpeed.toFixed(1);
+    updateBoltState();
   }
 
   function applySpeed(rawKmh, smoothFactor) {
