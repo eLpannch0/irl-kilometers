@@ -1,93 +1,221 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IRL KM + Speed</title>
 <style>
-html,body{margin:0;background:transparent;overflow:hidden;font-family:Arial}
-#bar{
-  position:fixed;bottom:10px;left:50%;transform:translateX(-50%);
-  display:flex;gap:18px;align-items:center;
-  background:rgba(0,0,0,.6);backdrop-filter:blur(8px);
-  border-radius:20px;padding:6px 14px;color:#fff;font-size:14px;
-  box-shadow:0 0 10px rgba(0,0,0,.4)
-}
-.block{display:flex;align-items:center;gap:6px}
-.label{opacity:.7;font-size:11px}
-.value{font-weight:bold;font-size:16px}
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+    font-family: Inter, Arial, sans-serif;
+  }
+
+  #bar {
+    position: fixed;
+    left: 50%;
+    bottom: 2px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 14px;
+    background: rgba(8, 8, 12, 0.72);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow:
+      0 6px 22px rgba(0,0,0,0.35),
+      inset 0 1px 0 rgba(255,255,255,0.06);
+    color: #fff;
+    white-space: nowrap;
+  }
+
+  .item {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+  }
+
+  .divider {
+    width: 1px;
+    height: 22px;
+    background: rgba(255,255,255,0.12);
+  }
+
+  .label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.58);
+  }
+
+  .num {
+    font-size: 22px;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: 0.5px;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(180deg, #ffffff 0%, #d9ddff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow:
+      0 0 10px rgba(255,255,255,0.10),
+      0 0 18px rgba(155,120,255,0.10);
+  }
+
+  .unit {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.72);
+    letter-spacing: 0.4px;
+  }
+
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #7d5cff;
+    box-shadow: 0 0 10px rgba(125,92,255,0.75);
+    flex: 0 0 auto;
+  }
 </style>
 </head>
 <body>
 
 <div id="bar">
-  <div class="block">
-    <span class="label">KM</span>
-    <span class="value" id="km">0.00</span>
+  <span class="live-dot"></span>
+
+  <div class="item">
+    <span class="label">km</span>
+    <span class="num" id="km">0.00</span>
   </div>
-  <div class="block">
-    <span class="label">SPEED</span>
-    <span class="value" id="speed">0.0</span> km/h
+
+  <div class="divider"></div>
+
+  <div class="item">
+    <span class="label">speed</span>
+    <span class="num" id="speed">0.0</span>
+    <span class="unit">km/h</span>
   </div>
 </div>
 
 <script>
-let totalKm = 0;
-let last = null;
+  let totalKm = 0;
+  let lastPoint = null;
+  let speedBuffer = [];
+  let smoothSpeed = 0;
 
-// настройки фильтра
-const MIN_MOVE_METERS = 2;   // игнор мелкого дрожания GPS
-const MAX_SPEED_KMH  = 50;  // отсечь бредовые скачки
-const SMOOTH_ALPHA   = 0.3; // сглаживание (0..1)
+  const MIN_ACCURACY = 35;       // игнор плохой GPS
+  const MIN_MOVE_M = 3;          // мелкую дрожь игнорируем
+  const MAX_MOVE_M = 80;         // отсечь безумные скачки
+  const MAX_SPEED_KMH = 20;      // для ходьбы; если нужен велик — поставь 45
+  const SPEED_BUFFER_SIZE = 5;   // среднее по последним значениям
+  const SMOOTH_FACTOR = 0.35;    // сглаживание скорости
+  const STOP_TIMEOUT_MS = 4500;  // если новых нормальных движений нет — скорость в 0
 
-let smoothSpeed = 0;
+  let lastGoodMoveTime = Date.now();
 
-function toRad(x){return x*Math.PI/180}
-function distMeters(a,b){
-  const R=6371000;
-  const dLat=toRad(b.latitude-a.latitude);
-  const dLon=toRad(b.longitude-a.longitude);
-  const A=Math.sin(dLat/2)**2 +
-    Math.cos(toRad(a.latitude))*Math.cos(toRad(b.latitude))*
-    Math.sin(dLon/2)**2;
-  return 2*R*Math.atan2(Math.sqrt(A),Math.sqrt(1-A));
-}
-
-navigator.geolocation.watchPosition(pos=>{
-  const now = {
-    lat: pos.coords.latitude,
-    lon: pos.coords.longitude,
-    t:   pos.timestamp
-  };
-
-  if (last){
-    const meters = distMeters(
-      {latitude:last.lat, longitude:last.lon},
-      {latitude:now.lat,  longitude:now.lon}
-    );
-    const dt = (now.t - last.t)/1000; // секунды
-
-    if (dt > 0){
-      const kmh = (meters/1000) / (dt/3600); // км/ч
-
-      // фильтры
-      if (meters >= MIN_MOVE_METERS && kmh < MAX_SPEED_KMH){
-        totalKm += meters/1000;
-
-        // сглаживание скорости
-        smoothSpeed = SMOOTH_ALPHA*kmh + (1-SMOOTH_ALPHA)*smoothSpeed;
-
-        document.getElementById("km").innerText = totalKm.toFixed(2);
-        document.getElementById("speed").innerText = smoothSpeed.toFixed(1);
-      }
-    }
+  function toRad(v) {
+    return v * Math.PI / 180;
   }
 
-  last = now;
+  function distanceMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
 
-}, err=>console.log(err), {
-  enableHighAccuracy:true,
-  maximumAge:1000
-});
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  function avg(arr) {
+    if (!arr.length) return 0;
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
+  }
+
+  function updateUI() {
+    document.getElementById("km").textContent = totalKm.toFixed(2);
+    document.getElementById("speed").textContent = smoothSpeed.toFixed(1);
+  }
+
+  function handlePosition(pos) {
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    const acc = pos.coords.accuracy || 999;
+    const ts = pos.timestamp;
+
+    if (acc > MIN_ACCURACY) {
+      if (Date.now() - lastGoodMoveTime > STOP_TIMEOUT_MS) {
+        smoothSpeed = smoothSpeed * 0.75;
+        if (smoothSpeed < 0.2) smoothSpeed = 0;
+        updateUI();
+      }
+      return;
+    }
+
+    const current = { lat, lon, ts, acc };
+
+    if (!lastPoint) {
+      lastPoint = current;
+      updateUI();
+      return;
+    }
+
+    const dt = (current.ts - lastPoint.ts) / 1000;
+    if (dt <= 0) return;
+
+    const meters = distanceMeters(lastPoint.lat, lastPoint.lon, current.lat, current.lon);
+    const kmh = (meters / dt) * 3.6;
+
+    if (meters >= MIN_MOVE_M && meters <= MAX_MOVE_M && kmh <= MAX_SPEED_KMH) {
+      totalKm += meters / 1000;
+      lastGoodMoveTime = Date.now();
+
+      speedBuffer.push(kmh);
+      if (speedBuffer.length > SPEED_BUFFER_SIZE) {
+        speedBuffer.shift();
+      }
+
+      const avgSpeed = avg(speedBuffer);
+      smoothSpeed = smoothSpeed + (avgSpeed - smoothSpeed) * SMOOTH_FACTOR;
+      lastPoint = current;
+    } else {
+      if (Date.now() - lastGoodMoveTime > STOP_TIMEOUT_MS) {
+        speedBuffer = [];
+        smoothSpeed = smoothSpeed * 0.75;
+        if (smoothSpeed < 0.2) smoothSpeed = 0;
+      }
+      lastPoint = current;
+    }
+
+    updateUI();
+  }
+
+  function handleError(err) {
+    console.log("Geo error:", err);
+  }
+
+  if ("geolocation" in navigator) {
+    navigator.geolocation.watchPosition(handlePosition, handleError, {
+      enableHighAccuracy: true,
+      maximumAge: 1000,
+      timeout: 10000
+    });
+  } else {
+    console.log("Geolocation not supported");
+  }
+
+  updateUI();
 </script>
 
 </body>
