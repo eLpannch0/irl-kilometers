@@ -33,7 +33,6 @@
       white-space: nowrap;
     }
 
-    /* ⚡ МОЛНИЯ */
     .bolt-wrap {
       width: 20px;
       height: 24px;
@@ -83,43 +82,55 @@
       font-size: 10px;
       font-weight: 700;
       color: rgba(255,255,255,0.55);
+      text-transform: lowercase;
     }
 
-    /* 🔵 SPEED */
     .num {
       font-size: 26px;
       font-weight: 900;
-      color: #4fc3ff;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 1px;
       transition: 0.2s;
     }
 
-    .speed-idle {
+    /* ОДИНАКОВЫЕ СТИЛИ ДЛЯ ОБОИХ ЧИСЕЛ */
+    .glow-idle {
       color: #4fc3ff;
-      text-shadow: 0 0 6px #4fc3ff;
-    }
-
-    .speed-mid {
-      color: #8a2eff;
-      text-shadow: 0 0 10px #8a2eff, 0 0 20px #8a2eff;
-    }
-
-    .speed-fast {
-      color: #ff8a00;
-      text-shadow: 0 0 12px #ff8a00, 0 0 25px #ff3cac;
-    }
-
-    .speed-flash {
-      transform: scale(1.15);
       text-shadow:
-        0 0 15px #fff,
-        0 0 25px #00e5ff,
-        0 0 35px #ff3cac,
-        0 0 45px #ff8a00;
+        0 0 4px #4fc3ff,
+        0 0 10px #2196f3;
+    }
+
+    .glow-mid {
+      color: #8a2eff;
+      text-shadow:
+        0 0 8px #8a2eff,
+        0 0 18px #8a2eff,
+        0 0 28px rgba(138,46,255,0.55);
+    }
+
+    .glow-fast {
+      color: #ff8a00;
+      text-shadow:
+        0 0 10px #ff8a00,
+        0 0 20px #ff3cac,
+        0 0 32px rgba(255,138,0,0.65);
+    }
+
+    .glow-flash {
+      transform: scale(1.13);
+      text-shadow:
+        0 0 15px #ffffff,
+        0 0 24px #00e5ff,
+        0 0 36px #ff3cac,
+        0 0 48px #ff8a00;
     }
 
     .unit {
       font-size: 11px;
       color: rgba(255,255,255,0.7);
+      font-weight: 700;
     }
 
     .divider {
@@ -133,7 +144,7 @@
 
 <div id="bar">
   <span class="bolt-wrap">
-    <svg class="bolt" id="boltIcon" viewBox="0 0 24 30">
+    <svg class="bolt" id="boltIcon" viewBox="0 0 24 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <defs>
         <linearGradient id="boltGradient" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#00e5ff"/>
@@ -147,14 +158,14 @@
 
   <div class="item">
     <span class="label">km</span>
-    <span class="num" id="distanceValue">0.000</span>
+    <span class="num glow-idle" id="distanceValue">0.000</span>
   </div>
 
   <div class="divider"></div>
 
   <div class="item">
     <span class="label">speed</span>
-    <span class="num speed-idle" id="speed">0.0</span>
+    <span class="num glow-idle" id="speed">0.0</span>
     <span class="unit">km/h</span>
   </div>
 </div>
@@ -167,66 +178,98 @@
   let lastSpeed = 0;
   let totalMeters = 0;
   let lastPos = null;
+  let flashTimeout = null;
+
+  function setGlowState(state) {
+    const states = ['glow-idle', 'glow-mid', 'glow-fast'];
+    distanceEl.classList.remove(...states);
+    speedEl.classList.remove(...states);
+
+    distanceEl.classList.add(state);
+    speedEl.classList.add(state);
+  }
+
+  function triggerFlash() {
+    distanceEl.classList.add('glow-flash');
+    speedEl.classList.add('glow-flash');
+    bolt.classList.add('flash');
+
+    clearTimeout(flashTimeout);
+    flashTimeout = setTimeout(() => {
+      distanceEl.classList.remove('glow-flash');
+      speedEl.classList.remove('glow-flash');
+      bolt.classList.remove('flash');
+    }, 220);
+  }
 
   function updateSpeedVisual(speed) {
-    speedEl.classList.remove('speed-idle','speed-mid','speed-fast');
-
     if (speed >= 20) {
-      speedEl.classList.add('speed-fast');
+      setGlowState('glow-fast');
     } else if (speed >= 10) {
-      speedEl.classList.add('speed-mid');
+      setGlowState('glow-mid');
     } else {
-      speedEl.classList.add('speed-idle');
+      setGlowState('glow-idle');
     }
 
     const delta = speed - lastSpeed;
 
     if (delta > 1.5) {
-      speedEl.classList.add('speed-flash');
-      bolt.classList.add('flash');
-
-      setTimeout(() => {
-        speedEl.classList.remove('speed-flash');
-        bolt.classList.remove('flash');
-      }, 200);
+      triggerFlash();
     }
 
     lastSpeed = speed;
   }
 
-  function calcDistance(a,b){
-    const R=6371000;
-    const dLat=(b.lat-a.lat)*Math.PI/180;
-    const dLon=(b.lon-a.lon)*Math.PI/180;
-    const lat1=a.lat*Math.PI/180;
-    const lat2=b.lat*Math.PI/180;
+  function calcDistance(a, b) {
+    const R = 6371000;
+    const dLat = (b.lat - a.lat) * Math.PI / 180;
+    const dLon = (b.lon - a.lon) * Math.PI / 180;
+    const lat1 = a.lat * Math.PI / 180;
+    const lat2 = b.lat * Math.PI / 180;
 
-    const x = Math.sin(dLat/2)**2 +
-              Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+    const x =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
 
-    return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+    return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
   }
 
-  navigator.geolocation.watchPosition(pos=>{
+  navigator.geolocation.watchPosition(pos => {
     const lat = pos.coords.latitude;
     const lon = pos.coords.longitude;
-    const speed = (pos.coords.speed || 0) * 3.6;
+    const accuracy = pos.coords.accuracy || 999;
+    const rawSpeed = pos.coords.speed;
+    const gpsSpeed = (rawSpeed != null && rawSpeed >= 0) ? rawSpeed * 3.6 : 0;
+
+    let finalSpeed = gpsSpeed;
 
     if (lastPos) {
-      const d = calcDistance(lastPos, {lat,lon});
-      if (d > 1.5) totalMeters += d;
+      const d = calcDistance(lastPos, { lat, lon });
+      const dt = (Date.now() - lastPos.t) / 1000;
+
+      if ((!finalSpeed || finalSpeed <= 0) && dt > 0) {
+        finalSpeed = (d / dt) * 3.6;
+      }
+
+      const accuracyOk = accuracy <= 40;
+      const distanceOk = d >= 1.5 && d <= 80;
+      const movingOk = finalSpeed >= 1.0 && finalSpeed <= 45;
+
+      if (accuracyOk && distanceOk && movingOk) {
+        totalMeters += d;
+      }
     }
 
-    lastPos = {lat,lon};
+    lastPos = { lat, lon, t: Date.now() };
 
-    distanceEl.textContent = (totalMeters/1000).toFixed(3);
-    speedEl.textContent = speed.toFixed(1);
+    distanceEl.textContent = (totalMeters / 1000).toFixed(3);
+    speedEl.textContent = finalSpeed.toFixed(1);
 
-    updateSpeedVisual(speed);
+    updateSpeedVisual(finalSpeed);
 
-  }, err=>console.log(err), {
-    enableHighAccuracy:true,
-    maximumAge:0
+  }, err => console.log(err), {
+    enableHighAccuracy: true,
+    maximumAge: 0
   });
 </script>
 
