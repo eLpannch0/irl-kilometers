@@ -98,8 +98,8 @@
   <span class="dot"></span>
 
   <div class="item">
-    <span class="label" id="distanceLabel">m</span>
-    <span class="num" id="distanceValue">0</span>
+    <span class="label">km</span>
+    <span class="num" id="distanceValue">0.000</span>
   </div>
 
   <div class="divider"></div>
@@ -113,7 +113,6 @@
 
 <script>
   const distanceValueEl = document.getElementById('distanceValue');
-  const distanceLabelEl = document.getElementById('distanceLabel');
   const speedEl = document.getElementById('speed');
 
   let totalMeters = 0;
@@ -164,14 +163,7 @@
   }
 
   function updateUI() {
-    if (totalMeters < 1000) {
-      distanceValueEl.textContent = Math.round(totalMeters);
-      distanceLabelEl.textContent = 'm';
-    } else {
-      distanceValueEl.textContent = (totalMeters / 1000).toFixed(2);
-      distanceLabelEl.textContent = 'km';
-    }
-
+    distanceValueEl.textContent = (totalMeters / 1000).toFixed(3);
     speedEl.textContent = smoothSpeed.toFixed(1);
   }
 
@@ -186,3 +178,79 @@
   }
 
   function decaySpeedIfStopped() {
+    const now = Date.now();
+    if (now - lastMoveTime > STOP_TIMEOUT_MS) {
+      smoothSpeed *= 0.55;
+      if (smoothSpeed < 0.8) smoothSpeed = 0;
+      updateUI();
+    }
+  }
+
+  function handlePosition(pos) {
+    const { latitude, longitude, accuracy, speed } = pos.coords;
+    const timestamp = pos.timestamp;
+
+    if (!lastPoint) {
+      lastPoint = { latitude, longitude, timestamp, accuracy };
+      updateUI();
+      return;
+    }
+
+    const dt = (timestamp - lastPoint.timestamp) / 1000;
+    if (dt <= 0) return;
+
+    const dist = distanceMeters(
+      lastPoint.latitude,
+      lastPoint.longitude,
+      latitude,
+      longitude
+    );
+
+    const nativeSpeed = (speed != null && speed >= 0) ? speed * 3.6 : null;
+    const calcSpeed = (dist / dt) * 3.6;
+
+    let finalSpeed = nativeSpeed;
+    if (!finalSpeed || finalSpeed <= 0 || finalSpeed > 60) {
+      finalSpeed = calcSpeed;
+    }
+
+    const adaptive = getAdaptiveSettings(finalSpeed);
+
+    if (finalSpeed >= adaptive.minSpeed && finalSpeed <= MAX_REAL_SPEED_KMH) {
+      applySpeed(finalSpeed, adaptive.smooth);
+      lastMoveTime = Date.now();
+    } else {
+      if (smoothSpeed < 0.8) smoothSpeed = 0;
+    }
+
+    const accuracyOk = accuracy <= MAX_ACCURACY_M;
+    const distanceOk = dist >= MIN_DISTANCE_M && dist <= MAX_DISTANCE_M;
+    const movingOk = finalSpeed >= MIN_MOVE_SPEED_KMH && finalSpeed <= MAX_REAL_SPEED_KMH;
+
+    if (accuracyOk && distanceOk && movingOk) {
+      totalMeters += dist;
+    }
+
+    lastPoint = { latitude, longitude, timestamp, accuracy };
+    updateUI();
+  }
+
+  function handleError(err) {
+    console.log('Geolocation error:', err);
+  }
+
+  if ('geolocation' in navigator) {
+    navigator.geolocation.watchPosition(handlePosition, handleError, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15000
+    });
+
+    setInterval(decaySpeedIfStopped, 1000);
+  }
+
+  updateUI();
+</script>
+
+</body>
+</html>
