@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -34,8 +35,9 @@
     }
 
     .bolt-wrap {
-      width: 20px;
-      height: 24px;
+      width: 18px;
+      height: 22px;
+      flex: 0 0 auto;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -44,32 +46,19 @@
     .bolt {
       width: 18px;
       height: 22px;
-      opacity: 0.7;
-      transition: 0.2s;
+      display: block;
+      filter:
+        drop-shadow(0 0 3px rgba(79,195,255,0.45))
+        drop-shadow(0 0 8px rgba(33,150,243,0.35));
+      opacity: 0.9;
     }
 
     .bolt path {
       stroke: url(#boltGradient);
-      stroke-width: 2.8;
+      stroke-width: 2.6;
       fill: none;
-      stroke-linecap: round;
       stroke-linejoin: round;
-      stroke-dasharray: 120;
-      stroke-dashoffset: 120;
-      animation: flow 2.2s linear infinite;
-    }
-
-    .bolt.flash {
-      transform: scale(1.2);
-      filter:
-        drop-shadow(0 0 10px #00e5ff)
-        drop-shadow(0 0 18px #8a2eff)
-        drop-shadow(0 0 25px #ff8a00);
-    }
-
-    @keyframes flow {
-      0% { stroke-dashoffset: 120; }
-      100% { stroke-dashoffset: 0; }
+      stroke-linecap: round;
     }
 
     .item {
@@ -80,9 +69,11 @@
 
     .label {
       font-size: 10px;
+      text-transform: lowercase;
+      letter-spacing: 1px;
       font-weight: 700;
       color: rgba(255,255,255,0.55);
-      text-transform: lowercase;
+      min-width: 18px;
     }
 
     .num {
@@ -91,46 +82,17 @@
       line-height: 1;
       font-variant-numeric: tabular-nums;
       letter-spacing: 1px;
-      transition: 0.2s;
-    }
-
-    /* ОДИНАКОВЫЕ СТИЛИ ДЛЯ ОБОИХ ЧИСЕЛ */
-    .glow-idle {
       color: #4fc3ff;
       text-shadow:
         0 0 4px #4fc3ff,
-        0 0 10px #2196f3;
-    }
-
-    .glow-mid {
-      color: #8a2eff;
-      text-shadow:
-        0 0 8px #8a2eff,
-        0 0 18px #8a2eff,
-        0 0 28px rgba(138,46,255,0.55);
-    }
-
-    .glow-fast {
-      color: #ff8a00;
-      text-shadow:
-        0 0 10px #ff8a00,
-        0 0 20px #ff3cac,
-        0 0 32px rgba(255,138,0,0.65);
-    }
-
-    .glow-flash {
-      transform: scale(1.13);
-      text-shadow:
-        0 0 15px #ffffff,
-        0 0 24px #00e5ff,
-        0 0 36px #ff3cac,
-        0 0 48px #ff8a00;
+        0 0 10px #2196f3,
+        0 0 18px rgba(33,150,243,0.45);
     }
 
     .unit {
       font-size: 11px;
-      color: rgba(255,255,255,0.7);
       font-weight: 700;
+      color: rgba(255,255,255,0.72);
     }
 
     .divider {
@@ -144,12 +106,12 @@
 
 <div id="bar">
   <span class="bolt-wrap">
-    <svg class="bolt" id="boltIcon" viewBox="0 0 24 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <svg class="bolt" viewBox="0 0 24 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <defs>
         <linearGradient id="boltGradient" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#00e5ff"/>
-          <stop offset="50%" stop-color="#8a2eff"/>
-          <stop offset="100%" stop-color="#ff8a00"/>
+          <stop offset="50%" stop-color="#4fc3ff"/>
+          <stop offset="100%" stop-color="#8a2eff"/>
         </linearGradient>
       </defs>
       <path d="M13 2 L6.5 15 H11 L8.5 28 L18 12.5 H13.5 L17 2 Z"></path>
@@ -158,119 +120,157 @@
 
   <div class="item">
     <span class="label">km</span>
-    <span class="num glow-idle" id="distanceValue">0.000</span>
+    <span class="num" id="distanceValue">0.000</span>
   </div>
 
   <div class="divider"></div>
 
   <div class="item">
     <span class="label">speed</span>
-    <span class="num glow-idle" id="speed">0.0</span>
+    <span class="num" id="speed">0.0</span>
     <span class="unit">km/h</span>
   </div>
 </div>
 
 <script>
+  const distanceValueEl = document.getElementById('distanceValue');
   const speedEl = document.getElementById('speed');
-  const distanceEl = document.getElementById('distanceValue');
-  const bolt = document.getElementById('boltIcon');
 
-  let lastSpeed = 0;
   let totalMeters = 0;
-  let lastPos = null;
-  let flashTimeout = null;
+  let lastPoint = null;
+  let speedSamples = [];
+  let smoothSpeed = 0;
+  let lastMoveTime = 0;
 
-  function setGlowState(state) {
-    const states = ['glow-idle', 'glow-mid', 'glow-fast'];
-    distanceEl.classList.remove(...states);
-    speedEl.classList.remove(...states);
+  const MAX_ACCURACY_M = 40;
+  const MIN_DISTANCE_M = 1.5;
+  const MAX_DISTANCE_M = 80;
+  const MIN_MOVE_SPEED_KMH = 1.0;
+  const MAX_REAL_SPEED_KMH = 45;
+  const SAMPLE_WINDOW = 5;
+  const STOP_TIMEOUT_MS = 3500;
 
-    distanceEl.classList.add(state);
-    speedEl.classList.add(state);
+  function toRad(v) {
+    return v * Math.PI / 180;
   }
 
-  function triggerFlash() {
-    distanceEl.classList.add('glow-flash');
-    speedEl.classList.add('glow-flash');
-    bolt.classList.add('flash');
-
-    clearTimeout(flashTimeout);
-    flashTimeout = setTimeout(() => {
-      distanceEl.classList.remove('glow-flash');
-      speedEl.classList.remove('glow-flash');
-      bolt.classList.remove('flash');
-    }, 220);
-  }
-
-  function updateSpeedVisual(speed) {
-    if (speed >= 20) {
-      setGlowState('glow-fast');
-    } else if (speed >= 10) {
-      setGlowState('glow-mid');
-    } else {
-      setGlowState('glow-idle');
-    }
-
-    const delta = speed - lastSpeed;
-
-    if (delta > 1.5) {
-      triggerFlash();
-    }
-
-    lastSpeed = speed;
-  }
-
-  function calcDistance(a, b) {
+  function distanceMeters(lat1, lon1, lat2, lon2) {
     const R = 6371000;
-    const dLat = (b.lat - a.lat) * Math.PI / 180;
-    const dLon = (b.lon - a.lon) * Math.PI / 180;
-    const lat1 = a.lat * Math.PI / 180;
-    const lat2 = b.lat * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
 
-    const x =
+    const a =
       Math.sin(dLat / 2) ** 2 +
-      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) ** 2;
 
-    return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   }
 
-  navigator.geolocation.watchPosition(pos => {
-    const lat = pos.coords.latitude;
-    const lon = pos.coords.longitude;
-    const accuracy = pos.coords.accuracy || 999;
-    const rawSpeed = pos.coords.speed;
-    const gpsSpeed = (rawSpeed != null && rawSpeed >= 0) ? rawSpeed * 3.6 : 0;
+  function avg(arr) {
+    if (!arr.length) return 0;
+    return arr.reduce((s, v) => s + v, 0) / arr.length;
+  }
 
-    let finalSpeed = gpsSpeed;
+  function getAdaptiveSettings(speedKmh) {
+    if (speedKmh < 7) {
+      return { minSpeed: 1.0, smooth: 0.45 };
+    }
+    if (speedKmh < 18) {
+      return { minSpeed: 2.0, smooth: 0.35 };
+    }
+    return { minSpeed: 5.0, smooth: 0.25 };
+  }
 
-    if (lastPos) {
-      const d = calcDistance(lastPos, { lat, lon });
-      const dt = (Date.now() - lastPos.t) / 1000;
+  function updateUI() {
+    distanceValueEl.textContent = (totalMeters / 1000).toFixed(3);
+    speedEl.textContent = smoothSpeed.toFixed(1);
+  }
 
-      if ((!finalSpeed || finalSpeed <= 0) && dt > 0) {
-        finalSpeed = (d / dt) * 3.6;
-      }
+  function applySpeed(rawKmh, smoothFactor) {
+    speedSamples.push(rawKmh);
+    if (speedSamples.length > SAMPLE_WINDOW) speedSamples.shift();
 
-      const accuracyOk = accuracy <= 40;
-      const distanceOk = d >= 1.5 && d <= 80;
-      const movingOk = finalSpeed >= 1.0 && finalSpeed <= 45;
+    const averaged = avg(speedSamples);
+    smoothSpeed += (averaged - smoothSpeed) * smoothFactor;
 
-      if (accuracyOk && distanceOk && movingOk) {
-        totalMeters += d;
-      }
+    if (smoothSpeed < 0.8) smoothSpeed = 0;
+  }
+
+  function decaySpeedIfStopped() {
+    const now = Date.now();
+    if (now - lastMoveTime > STOP_TIMEOUT_MS) {
+      smoothSpeed *= 0.55;
+      if (smoothSpeed < 0.8) smoothSpeed = 0;
+      updateUI();
+    }
+  }
+
+  function handlePosition(pos) {
+    const { latitude, longitude, accuracy, speed } = pos.coords;
+    const timestamp = pos.timestamp;
+
+    if (!lastPoint) {
+      lastPoint = { latitude, longitude, timestamp, accuracy };
+      updateUI();
+      return;
     }
 
-    lastPos = { lat, lon, t: Date.now() };
+    const dt = (timestamp - lastPoint.timestamp) / 1000;
+    if (dt <= 0) return;
 
-    distanceEl.textContent = (totalMeters / 1000).toFixed(3);
-    speedEl.textContent = finalSpeed.toFixed(1);
+    const dist = distanceMeters(
+      lastPoint.latitude,
+      lastPoint.longitude,
+      latitude,
+      longitude
+    );
 
-    updateSpeedVisual(finalSpeed);
+    const nativeSpeed = (speed != null && speed >= 0) ? speed * 3.6 : null;
+    const calcSpeed = (dist / dt) * 3.6;
 
-  }, err => console.log(err), {
-    enableHighAccuracy: true,
-    maximumAge: 0
-  });
+    let finalSpeed = nativeSpeed;
+    if (!finalSpeed || finalSpeed <= 0 || finalSpeed > 60) {
+      finalSpeed = calcSpeed;
+    }
+
+    const adaptive = getAdaptiveSettings(finalSpeed);
+
+    if (finalSpeed >= adaptive.minSpeed && finalSpeed <= MAX_REAL_SPEED_KMH) {
+      applySpeed(finalSpeed, adaptive.smooth);
+      lastMoveTime = Date.now();
+    } else {
+      if (smoothSpeed < 0.8) smoothSpeed = 0;
+    }
+
+    const accuracyOk = accuracy <= MAX_ACCURACY_M;
+    const distanceOk = dist >= MIN_DISTANCE_M && dist <= MAX_DISTANCE_M;
+    const movingOk = finalSpeed >= MIN_MOVE_SPEED_KMH && finalSpeed <= MAX_REAL_SPEED_KMH;
+
+    if (accuracyOk && distanceOk && movingOk) {
+      totalMeters += dist;
+    }
+
+    lastPoint = { latitude, longitude, timestamp, accuracy };
+    updateUI();
+  }
+
+  function handleError(err) {
+    console.log('Geolocation error:', err);
+  }
+
+  if ('geolocation' in navigator) {
+    navigator.geolocation.watchPosition(handlePosition, handleError, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15000
+    });
+
+    setInterval(decaySpeedIfStopped, 1000);
+  }
+
+  updateUI();
 </script>
 
 </body>
