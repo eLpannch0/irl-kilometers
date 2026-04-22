@@ -4,52 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  overflow: hidden;
-  font-family: Arial, sans-serif;
+html,body{margin:0;background:transparent;overflow:hidden;font-family:Arial}
+#bar{
+  position:fixed;bottom:10px;left:50%;transform:translateX(-50%);
+  display:flex;gap:18px;align-items:center;
+  background:rgba(0,0,0,.6);backdrop-filter:blur(8px);
+  border-radius:20px;padding:6px 14px;color:#fff;font-size:14px;
+  box-shadow:0 0 10px rgba(0,0,0,.4)
 }
-
-#bar {
-  position: fixed;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 20px;
-  align-items: center;
-
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(8px);
-  border-radius: 20px;
-
-  padding: 6px 14px;
-  color: white;
-  font-size: 14px;
-
-  box-shadow: 0 0 10px rgba(0,0,0,0.4);
-}
-
-.block {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.label {
-  opacity: 0.7;
-  font-size: 11px;
-}
-
-.value {
-  font-weight: bold;
-  font-size: 16px;
-}
+.block{display:flex;align-items:center;gap:6px}
+.label{opacity:.7;font-size:11px}
+.value{font-weight:bold;font-size:16px}
 </style>
 </head>
-
 <body>
 
 <div id="bar">
@@ -57,57 +24,69 @@ html, body {
     <span class="label">KM</span>
     <span class="value" id="km">0.00</span>
   </div>
-
   <div class="block">
     <span class="label">SPEED</span>
-    <span class="value" id="speed">0</span> km/h
+    <span class="value" id="speed">0.0</span> km/h
   </div>
 </div>
 
 <script>
-let totalDistance = 0;
-let lastPos = null;
+let totalKm = 0;
+let last = null;
 
-function toRad(x) {
-  return x * Math.PI / 180;
+// настройки фильтра
+const MIN_MOVE_METERS = 2;   // игнор мелкого дрожания GPS
+const MAX_SPEED_KMH  = 50;  // отсечь бредовые скачки
+const SMOOTH_ALPHA   = 0.3; // сглаживание (0..1)
+
+let smoothSpeed = 0;
+
+function toRad(x){return x*Math.PI/180}
+function distMeters(a,b){
+  const R=6371000;
+  const dLat=toRad(b.latitude-a.latitude);
+  const dLon=toRad(b.longitude-a.longitude);
+  const A=Math.sin(dLat/2)**2 +
+    Math.cos(toRad(a.latitude))*Math.cos(toRad(b.latitude))*
+    Math.sin(dLon/2)**2;
+  return 2*R*Math.atan2(Math.sqrt(A),Math.sqrt(1-A));
 }
 
-function getDistance(p1, p2) {
-  const R = 6371;
-  const dLat = toRad(p2.latitude - p1.latitude);
-  const dLon = toRad(p2.longitude - p1.longitude);
+navigator.geolocation.watchPosition(pos=>{
+  const now = {
+    lat: pos.coords.latitude,
+    lon: pos.coords.longitude,
+    t:   pos.timestamp
+  };
 
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(toRad(p1.latitude)) * Math.cos(toRad(p2.latitude)) *
-            Math.sin(dLon/2) * Math.sin(dLon/2);
+  if (last){
+    const meters = distMeters(
+      {latitude:last.lat, longitude:last.lon},
+      {latitude:now.lat,  longitude:now.lon}
+    );
+    const dt = (now.t - last.t)/1000; // секунды
 
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
+    if (dt > 0){
+      const kmh = (meters/1000) / (dt/3600); // км/ч
 
-navigator.geolocation.watchPosition(pos => {
-  const coords = pos.coords;
+      // фильтры
+      if (meters >= MIN_MOVE_METERS && kmh < MAX_SPEED_KMH){
+        totalKm += meters/1000;
 
-  // скорость (м/с → км/ч)
-  if (coords.speed !== null) {
-    let speedKmh = coords.speed * 3.6;
-    document.getElementById("speed").innerText = speedKmh.toFixed(1);
-  }
+        // сглаживание скорости
+        smoothSpeed = SMOOTH_ALPHA*kmh + (1-SMOOTH_ALPHA)*smoothSpeed;
 
-  // километраж
-  if (lastPos) {
-    const dist = getDistance(lastPos.coords, coords);
-    if (dist > 0.001) { // фильтр от шума GPS
-      totalDistance += dist;
-      document.getElementById("km").innerText = totalDistance.toFixed(2);
+        document.getElementById("km").innerText = totalKm.toFixed(2);
+        document.getElementById("speed").innerText = smoothSpeed.toFixed(1);
+      }
     }
   }
 
-  lastPos = pos;
+  last = now;
 
-}, err => console.log(err), {
-  enableHighAccuracy: true,
-  maximumAge: 1000
+}, err=>console.log(err), {
+  enableHighAccuracy:true,
+  maximumAge:1000
 });
 </script>
 
