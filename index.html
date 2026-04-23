@@ -20,10 +20,10 @@
       transform: translateX(-50%);
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 8px 14px;
-      border-radius: 18px;
-      background: rgba(15,15,20,0.82);
+      gap: 16px;
+      padding: 10px 18px;
+      border-radius: 22px;
+      background: rgba(15,15,20,0.84);
       border: 1px solid rgba(255,255,255,0.08);
       box-shadow: 0 6px 20px rgba(0,0,0,0.35);
       color: #fff;
@@ -32,32 +32,49 @@
       -webkit-backdrop-filter: blur(8px);
     }
 
-    .bolt {
-      font-size: 15px;
-      line-height: 1;
-      color: #4fc3ff;
-      text-shadow:
-        0 0 4px #4fc3ff,
-        0 0 10px rgba(79,195,255,0.6);
+    .bolt-wrap {
+      width: 24px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       flex: 0 0 auto;
+    }
+
+    .bolt {
+      width: 22px;
+      height: 26px;
+      display: block;
+      filter:
+        drop-shadow(0 0 3px rgba(255,255,255,0.25))
+        drop-shadow(0 0 8px rgba(0,229,255,0.35))
+        drop-shadow(0 0 14px rgba(138,46,255,0.35));
+    }
+
+    .bolt path {
+      stroke: url(#boltGradient);
+      stroke-width: 2.8;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
 
     .item {
       display: flex;
       align-items: baseline;
-      gap: 6px;
+      gap: 7px;
     }
 
     .label {
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 1px;
       text-transform: lowercase;
-      color: rgba(255,255,255,0.55);
+      color: rgba(255,255,255,0.58);
     }
 
     .num {
-      font-size: 25px;
+      font-size: 34px;
       font-weight: 900;
       line-height: 1;
       font-variant-numeric: tabular-nums;
@@ -70,14 +87,14 @@
     }
 
     .unit {
-      font-size: 11px;
+      font-size: 13px;
       font-weight: 700;
-      color: rgba(255,255,255,0.7);
+      color: rgba(255,255,255,0.72);
     }
 
     .divider {
       width: 1px;
-      height: 20px;
+      height: 26px;
       background: rgba(255,255,255,0.12);
     }
   </style>
@@ -85,7 +102,19 @@
 <body>
 
 <div id="bar">
-  <span class="bolt">⚡</span>
+  <span class="bolt-wrap">
+    <svg class="bolt" viewBox="0 0 24 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="boltGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#00e5ff"/>
+          <stop offset="45%" stop-color="#4fc3ff"/>
+          <stop offset="75%" stop-color="#8a2eff"/>
+          <stop offset="100%" stop-color="#ff8a00"/>
+        </linearGradient>
+      </defs>
+      <path d="M13 2 L6.5 15 H11 L8.5 28 L18 12.5 H13.5 L17 2 Z"></path>
+    </svg>
+  </span>
 
   <div class="item">
     <span class="label">km</span>
@@ -111,7 +140,6 @@
   let speedBuffer = [];
   let lastMoveTime = 0;
 
-  // Настройки
   const MAX_ACCURACY_M = 45;
   const MIN_DISTANCE_M = 1.5;
   const MAX_DISTANCE_M = 100;
@@ -144,9 +172,9 @@
   }
 
   function getSmoothFactor(speedKmh) {
-    if (speedKmh < 7) return 0.45;   // ходьба
-    if (speedKmh < 18) return 0.35;  // бег / медленно
-    return 0.25;                     // велик
+    if (speedKmh < 7) return 0.45;
+    if (speedKmh < 18) return 0.35;
+    return 0.25;
   }
 
   function updateUI() {
@@ -195,7 +223,6 @@
       longitude
     );
 
-    // Берём нативную скорость, если есть. Иначе считаем сами.
     const nativeSpeedKmh = (speed != null && speed >= 0) ? speed * 3.6 : null;
     const calcSpeedKmh = (dist / dt) * 3.6;
     let finalSpeedKmh = nativeSpeedKmh;
@@ -204,7 +231,6 @@
       finalSpeedKmh = calcSpeedKmh;
     }
 
-    // Обновляем скорость
     if (finalSpeedKmh >= MIN_SPEED_KMH && finalSpeedKmh <= MAX_SPEED_KMH) {
       applySpeed(finalSpeedKmh);
       lastMoveTime = Date.now();
@@ -212,7 +238,6 @@
       if (smoothSpeed < 0.8) smoothSpeed = 0;
     }
 
-    // Добавляем дистанцию только по нормальным точкам
     const accuracyOk = accuracy <= MAX_ACCURACY_M;
     const distanceOk = dist >= MIN_DISTANCE_M && dist <= MAX_DISTANCE_M;
     const movingOk = finalSpeedKmh >= MIN_SPEED_KMH && finalSpeedKmh <= MAX_SPEED_KMH;
