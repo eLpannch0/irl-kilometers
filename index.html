@@ -1,18 +1,16 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>IRL Distance + Speed</title>
-
   <style>
     html, body {
       margin: 0;
       padding: 0;
       background: transparent;
       overflow: hidden;
-      font-family: Inter, Arial, sans-serif;
+      font-family: Arial, sans-serif;
     }
 
     #bar {
@@ -22,43 +20,26 @@
       transform: translateX(-50%);
       display: flex;
       align-items: center;
-      gap: 14px;
-      padding: 8px 16px;
-      border-radius: 20px;
-      background: rgba(10, 10, 14, 0.82);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      gap: 12px;
+      padding: 8px 14px;
+      border-radius: 18px;
+      background: rgba(15,15,20,0.82);
       border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: 0 6px 24px rgba(0,0,0,0.35);
-      color: white;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+      color: #fff;
       white-space: nowrap;
-    }
-
-    .bolt-wrap {
-      width: 18px;
-      height: 22px;
-      flex: 0 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
     }
 
     .bolt {
-      width: 18px;
-      height: 22px;
-      display: block;
-      filter:
-        drop-shadow(0 0 3px rgba(79,195,255,0.45))
-        drop-shadow(0 0 8px rgba(33,150,243,0.35));
-      opacity: 0.9;
-    }
-
-    .bolt path {
-      stroke: url(#boltGradient);
-      stroke-width: 2.6;
-      fill: none;
-      stroke-linejoin: round;
-      stroke-linecap: round;
+      font-size: 15px;
+      line-height: 1;
+      color: #4fc3ff;
+      text-shadow:
+        0 0 4px #4fc3ff,
+        0 0 10px rgba(79,195,255,0.6);
+      flex: 0 0 auto;
     }
 
     .item {
@@ -69,35 +50,34 @@
 
     .label {
       font-size: 10px;
-      text-transform: lowercase;
-      letter-spacing: 1px;
       font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: lowercase;
       color: rgba(255,255,255,0.55);
-      min-width: 18px;
     }
 
     .num {
-      font-size: 26px;
+      font-size: 25px;
       font-weight: 900;
       line-height: 1;
       font-variant-numeric: tabular-nums;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
       color: #4fc3ff;
       text-shadow:
         0 0 4px #4fc3ff,
         0 0 10px #2196f3,
-        0 0 18px rgba(33,150,243,0.45);
+        0 0 18px rgba(33,150,243,0.35);
     }
 
     .unit {
       font-size: 11px;
       font-weight: 700;
-      color: rgba(255,255,255,0.72);
+      color: rgba(255,255,255,0.7);
     }
 
     .divider {
       width: 1px;
-      height: 22px;
+      height: 20px;
       background: rgba(255,255,255,0.12);
     }
   </style>
@@ -105,18 +85,7 @@
 <body>
 
 <div id="bar">
-  <span class="bolt-wrap">
-    <svg class="bolt" viewBox="0 0 24 30" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <defs>
-        <linearGradient id="boltGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#00e5ff"/>
-          <stop offset="50%" stop-color="#4fc3ff"/>
-          <stop offset="100%" stop-color="#8a2eff"/>
-        </linearGradient>
-      </defs>
-      <path d="M13 2 L6.5 15 H11 L8.5 28 L18 12.5 H13.5 L17 2 Z"></path>
-    </svg>
-  </span>
+  <span class="bolt">⚡</span>
 
   <div class="item">
     <span class="label">km</span>
@@ -127,27 +96,28 @@
 
   <div class="item">
     <span class="label">speed</span>
-    <span class="num" id="speed">0.0</span>
+    <span class="num" id="speedValue">0.0</span>
     <span class="unit">km/h</span>
   </div>
 </div>
 
 <script>
   const distanceValueEl = document.getElementById('distanceValue');
-  const speedEl = document.getElementById('speed');
+  const speedValueEl = document.getElementById('speedValue');
 
   let totalMeters = 0;
   let lastPoint = null;
-  let speedSamples = [];
   let smoothSpeed = 0;
+  let speedBuffer = [];
   let lastMoveTime = 0;
 
-  const MAX_ACCURACY_M = 40;
+  // Настройки
+  const MAX_ACCURACY_M = 45;
   const MIN_DISTANCE_M = 1.5;
-  const MAX_DISTANCE_M = 80;
-  const MIN_MOVE_SPEED_KMH = 1.0;
-  const MAX_REAL_SPEED_KMH = 45;
-  const SAMPLE_WINDOW = 5;
+  const MAX_DISTANCE_M = 100;
+  const MIN_SPEED_KMH = 1.0;
+  const MAX_SPEED_KMH = 45;
+  const SPEED_BUFFER_SIZE = 5;
   const STOP_TIMEOUT_MS = 3500;
 
   function toRad(v) {
@@ -160,9 +130,9 @@
     const dLon = toRad(lon2 - lon1);
 
     const a =
-      Math.sin(dLat / 2) ** 2 +
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) ** 2;
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
 
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
@@ -170,30 +140,28 @@
 
   function avg(arr) {
     if (!arr.length) return 0;
-    return arr.reduce((s, v) => s + v, 0) / arr.length;
+    return arr.reduce((sum, v) => sum + v, 0) / arr.length;
   }
 
-  function getAdaptiveSettings(speedKmh) {
-    if (speedKmh < 7) {
-      return { minSpeed: 1.0, smooth: 0.45 };
-    }
-    if (speedKmh < 18) {
-      return { minSpeed: 2.0, smooth: 0.35 };
-    }
-    return { minSpeed: 5.0, smooth: 0.25 };
+  function getSmoothFactor(speedKmh) {
+    if (speedKmh < 7) return 0.45;   // ходьба
+    if (speedKmh < 18) return 0.35;  // бег / медленно
+    return 0.25;                     // велик
   }
 
   function updateUI() {
     distanceValueEl.textContent = (totalMeters / 1000).toFixed(3);
-    speedEl.textContent = smoothSpeed.toFixed(1);
+    speedValueEl.textContent = smoothSpeed.toFixed(1);
   }
 
-  function applySpeed(rawKmh, smoothFactor) {
-    speedSamples.push(rawKmh);
-    if (speedSamples.length > SAMPLE_WINDOW) speedSamples.shift();
+  function applySpeed(rawKmh) {
+    speedBuffer.push(rawKmh);
+    if (speedBuffer.length > SPEED_BUFFER_SIZE) speedBuffer.shift();
 
-    const averaged = avg(speedSamples);
-    smoothSpeed += (averaged - smoothSpeed) * smoothFactor;
+    const averaged = avg(speedBuffer);
+    const smoothFactor = getSmoothFactor(averaged);
+
+    smoothSpeed = smoothSpeed + (averaged - smoothSpeed) * smoothFactor;
 
     if (smoothSpeed < 0.8) smoothSpeed = 0;
   }
@@ -227,26 +195,27 @@
       longitude
     );
 
-    const nativeSpeed = (speed != null && speed >= 0) ? speed * 3.6 : null;
-    const calcSpeed = (dist / dt) * 3.6;
+    // Берём нативную скорость, если есть. Иначе считаем сами.
+    const nativeSpeedKmh = (speed != null && speed >= 0) ? speed * 3.6 : null;
+    const calcSpeedKmh = (dist / dt) * 3.6;
+    let finalSpeedKmh = nativeSpeedKmh;
 
-    let finalSpeed = nativeSpeed;
-    if (!finalSpeed || finalSpeed <= 0 || finalSpeed > 60) {
-      finalSpeed = calcSpeed;
+    if (finalSpeedKmh == null || finalSpeedKmh <= 0 || finalSpeedKmh > 60) {
+      finalSpeedKmh = calcSpeedKmh;
     }
 
-    const adaptive = getAdaptiveSettings(finalSpeed);
-
-    if (finalSpeed >= adaptive.minSpeed && finalSpeed <= MAX_REAL_SPEED_KMH) {
-      applySpeed(finalSpeed, adaptive.smooth);
+    // Обновляем скорость
+    if (finalSpeedKmh >= MIN_SPEED_KMH && finalSpeedKmh <= MAX_SPEED_KMH) {
+      applySpeed(finalSpeedKmh);
       lastMoveTime = Date.now();
     } else {
       if (smoothSpeed < 0.8) smoothSpeed = 0;
     }
 
+    // Добавляем дистанцию только по нормальным точкам
     const accuracyOk = accuracy <= MAX_ACCURACY_M;
     const distanceOk = dist >= MIN_DISTANCE_M && dist <= MAX_DISTANCE_M;
-    const movingOk = finalSpeed >= MIN_MOVE_SPEED_KMH && finalSpeed <= MAX_REAL_SPEED_KMH;
+    const movingOk = finalSpeedKmh >= MIN_SPEED_KMH && finalSpeedKmh <= MAX_SPEED_KMH;
 
     if (accuracyOk && distanceOk && movingOk) {
       totalMeters += dist;
