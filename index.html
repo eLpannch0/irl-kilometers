@@ -1,506 +1,135 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>IRL Overlay Stable</title>
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body {
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+}
 
-    html, body {
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: transparent;
-      font-family: Arial, Helvetica, sans-serif;
-    }
+.hud {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  padding: 16px 28px;
+  border-radius: 25px;
+  background: rgba(30,30,30,0.55);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
 
-    body {
-      color: white;
-    }
+.lightning {
+  font-size: 26px;
+}
 
-    .overlay {
-      position: relative;
-      width: 100vw;
-      height: 100vh;
-      pointer-events: none;
-    }
+.block {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
-    /* ---------- TOP RIGHT INFO ---------- */
-    .top-right {
-      position: absolute;
-      top: 14px;
-      right: 14px;
-      display: flex;
-      align-items: stretch;
-      border-radius: 16px;
-      overflow: hidden;
-      backdrop-filter: blur(10px);
-      background: rgba(20, 20, 20, 0.22);
-      box-shadow: 0 6px 22px rgba(0,0,0,0.28);
-    }
+.value {
+  font-size: 36px;
+  font-weight: 900;
+  color: #00d9ff;
+  text-shadow: 0 0 12px rgba(0,217,255,0.7);
+}
 
-    .weather-box {
-      min-width: 106px;
-      padding: 8px 12px;
-      background: linear-gradient(180deg, rgba(40,40,40,0.6), rgba(25,25,25,0.55));
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      border-right: 1px solid rgba(255,255,255,0.12);
-    }
+.label {
+  font-size: 16px;
+  color: #aaa;
+}
 
-    .weather-city {
-      font-size: 14px;
-      line-height: 1;
-      opacity: 0.95;
-      margin-bottom: 4px;
-      font-weight: 700;
-    }
-
-    .weather-temp {
-      display: inline-block;
-      font-size: 26px;
-      font-weight: 900;
-      line-height: 1;
-      color: #7CFF57;
-      text-shadow: 0 0 10px rgba(124,255,87,0.55);
-    }
-
-    .time-box {
-      min-width: 78px;
-      padding: 8px 12px;
-      background: linear-gradient(180deg, rgba(55,55,55,0.54), rgba(30,30,30,0.5));
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .time-label {
-      font-size: 10px;
-      letter-spacing: 1px;
-      opacity: 0.7;
-      margin-bottom: 2px;
-    }
-
-    .time-value {
-      font-size: 28px;
-      font-weight: 900;
-      line-height: 1;
-    }
-
-    /* ---------- LEFT LIGHTNING ---------- */
-    .energy-wrap {
-      position: absolute;
-      left: 16px;
-      bottom: 70px;
-      width: 34px;
-      height: 220px;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-    }
-
-    .energy-shell {
-      position: relative;
-      width: 18px;
-      height: 205px;
-      border-radius: 12px;
-      background: rgba(20,20,20,0.28);
-      overflow: hidden;
-      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08),
-                  0 4px 16px rgba(0,0,0,0.22);
-    }
-
-    .energy-fill {
-      position: absolute;
-      left: 0;
-      bottom: 0;
-      width: 100%;
-      height: 75%;
-      background:
-        linear-gradient(
-          180deg,
-          #9dff7a 0%,
-          #69ff4a 20%,
-          #34f03b 45%,
-          #14d132 70%,
-          #0cb32c 100%
-        );
-      box-shadow: 0 0 18px rgba(90,255,90,0.45);
-    }
-
-    .energy-scan {
-      position: absolute;
-      top: -28%;
-      left: 0;
-      width: 100%;
-      height: 28%;
-      background: linear-gradient(
-        180deg,
-        rgba(255,255,255,0) 0%,
-        rgba(255,255,255,0.10) 35%,
-        rgba(255,255,255,0.55) 50%,
-        rgba(255,255,255,0.10) 65%,
-        rgba(255,255,255,0) 100%
-      );
-      animation: energyDown 1.8s linear infinite;
-      mix-blend-mode: screen;
-      pointer-events: none;
-    }
-
-    @keyframes energyDown {
-      0% { top: -30%; }
-      100% { top: 100%; }
-    }
-
-    .bolt {
-      position: absolute;
-      top: -34px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 22px;
-      filter: drop-shadow(0 0 8px rgba(173,255,47,0.8));
-    }
-
-    /* ---------- BOTTOM HUD ---------- */
-    .bottom-left {
-      position: absolute;
-      left: 16px;
-      bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      max-width: calc(100vw - 32px);
-    }
-
-    .pill {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 46px;
-      padding: 0 16px;
-      border-radius: 999px;
-      background: rgba(95,95,95,0.34);
-      backdrop-filter: blur(10px);
-      box-shadow: 0 5px 18px rgba(0,0,0,0.18);
-      font-weight: 800;
-      font-size: 20px;
-      line-height: 1;
-      color: #fff;
-      white-space: nowrap;
-    }
-
-    .nickname {
-      font-size: 18px;
-      padding: 0 18px;
-    }
-
-    .distance {
-      color: #ff8e8e;
-      font-size: 20px;
-      min-width: 240px;
-      justify-content: flex-start;
-      gap: 8px;
-    }
-
-    .fps {
-      min-width: 108px;
-    }
-
-    .speed-box {
-      position: absolute;
-      right: 18px;
-      bottom: 18px;
-      width: 84px;
-      height: 84px;
-      border-radius: 50%;
-      background: rgba(20,20,20,0.36);
-      backdrop-filter: blur(8px);
-      box-shadow: 0 5px 18px rgba(0,0,0,0.22);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .speed-label {
-      font-size: 10px;
-      opacity: 0.7;
-      margin-bottom: 2px;
-      letter-spacing: 1px;
-    }
-
-    .speed-value {
-      font-size: 22px;
-      font-weight: 900;
-      line-height: 1;
-    }
-
-    .speed-unit {
-      font-size: 10px;
-      opacity: 0.75;
-      margin-top: 2px;
-    }
-
-    .status-dot {
-      display: inline-block;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #7CFF57;
-      box-shadow: 0 0 10px rgba(124,255,87,0.8);
-      margin-right: 8px;
-      vertical-align: middle;
-    }
-  </style>
+.divider {
+  width: 2px;
+  height: 30px;
+  background: rgba(255,255,255,0.2);
+}
+</style>
 </head>
+
 <body>
-  <div class="overlay">
-    <!-- TOP RIGHT -->
-    <div class="top-right">
-      <div class="weather-box">
-        <div class="weather-city" id="city">Ottawa</div>
-        <div class="weather-temp" id="temp">--°C</div>
-      </div>
-      <div class="time-box">
-        <div class="time-label">TIME</div>
-        <div class="time-value" id="clock">--:--</div>
-      </div>
-    </div>
 
-    <!-- LEFT LIGHTNING -->
-    <div class="energy-wrap">
-      <div class="energy-shell">
-        <div class="energy-fill" id="energyFill"></div>
-        <div class="energy-scan"></div>
-      </div>
-      <div class="bolt">⚡</div>
-    </div>
+<div class="hud">
+  <div class="lightning">⚡</div>
 
-    <!-- BOTTOM -->
-    <div class="bottom-left">
-      <div class="pill nickname">eLpannch0</div>
-      <div class="pill distance">
-        <span class="status-dot"></span>
-        <span id="distanceText">0 m, 0.0 km</span>
-      </div>
-      <div class="pill fps" id="fpsText">30 fps</div>
-    </div>
-
-    <!-- SPEED -->
-    <div class="speed-box">
-      <div class="speed-label">GPS</div>
-      <div class="speed-value" id="speedValue">0</div>
-      <div class="speed-unit">km/h</div>
-    </div>
+  <div class="block">
+    <div class="value" id="km">0.000</div>
+    <div class="label">km</div>
   </div>
 
-  <script>
-    const cityEl = document.getElementById("city");
-    const tempEl = document.getElementById("temp");
-    const clockEl = document.getElementById("clock");
-    const distanceEl = document.getElementById("distanceText");
-    const speedEl = document.getElementById("speedValue");
-    const energyFillEl = document.getElementById("energyFill");
+  <div class="divider"></div>
 
-    let lastLat = null;
-    let lastLon = null;
-    let lastTime = null;
-    let totalMeters = 0;
-    let cityFetched = false;
-    let weatherCooldown = 0;
+  <div class="block">
+    <div class="value" id="speed">0.0</div>
+    <div class="label">km/h</div>
+  </div>
+</div>
 
-    const DISTANCE_KEY = "irl_overlay_total_meters_v2";
-    const LAST_POS_KEY = "irl_overlay_last_pos_v2";
+<script>
+let lastLat = null;
+let lastLon = null;
+let lastTime = null;
+let totalMeters = 0;
 
-    try {
-      const savedDistance = localStorage.getItem(DISTANCE_KEY);
-      if (savedDistance) totalMeters = parseFloat(savedDistance) || 0;
-    } catch (e) {}
+function distance(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = x => x * Math.PI/180;
 
-    try {
-      const savedPos = localStorage.getItem(LAST_POS_KEY);
-      if (savedPos) {
-        const p = JSON.parse(savedPos);
-        if (typeof p.lat === "number" && typeof p.lon === "number" && typeof p.time === "number") {
-          lastLat = p.lat;
-          lastLon = p.lon;
-          lastTime = p.time;
-        }
-      }
-    } catch (e) {}
+  const dLat = toRad(lat2-lat1);
+  const dLon = toRad(lon2-lon1);
 
-    function updateClock() {
-      const now = new Date();
-      const h = String(now.getHours()).padStart(2, "0");
-      const m = String(now.getMinutes()).padStart(2, "0");
-      clockEl.textContent = `${h}:${m}`;
+  const a = Math.sin(dLat/2)**2 +
+            Math.cos(toRad(lat1)) *
+            Math.cos(toRad(lat2)) *
+            Math.sin(dLon/2)**2;
+
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+}
+
+navigator.geolocation.watchPosition(pos => {
+  const lat = pos.coords.latitude;
+  const lon = pos.coords.longitude;
+  const time = pos.timestamp;
+
+  let speed = 0;
+
+  if (lastLat !== null) {
+    const d = distance(lastLat, lastLon, lat, lon);
+    const dt = (time - lastTime)/1000;
+
+    if (dt > 0 && d < 100) {
+      if (d > 1) totalMeters += d;
+      speed = (d/dt)*3.6;
     }
+  }
 
-    function haversine(lat1, lon1, lat2, lon2) {
-      const R = 6371000;
-      const toRad = deg => deg * Math.PI / 180;
+  if (pos.coords.speed != null) {
+    speed = pos.coords.speed * 3.6;
+  }
 
-      const dLat = toRad(lat2 - lat1);
-      const dLon = toRad(lon2 - lon1);
+  if (speed < 1) speed = 0;
 
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  document.getElementById("km").innerText = (totalMeters/1000).toFixed(3);
+  document.getElementById("speed").innerText = speed.toFixed(1);
 
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return R * c;
-    }
+  lastLat = lat;
+  lastLon = lon;
+  lastTime = time;
 
-    function renderDistance() {
-      const meters = Math.round(totalMeters);
-      const km = (totalMeters / 1000).toFixed(1);
-      distanceEl.textContent = `${meters} m, ${km} km`;
-    }
+}, err => {
+  console.log("GPS error", err);
+}, {
+  enableHighAccuracy: true
+});
+</script>
 
-    function renderEnergyBySpeed(speedKmh) {
-      let percent = 18;
-      if (speedKmh >= 2) percent = 28;
-      if (speedKmh >= 5) percent = 40;
-      if (speedKmh >= 10) percent = 55;
-      if (speedKmh >= 15) percent = 70;
-      if (speedKmh >= 22) percent = 82;
-      if (speedKmh >= 30) percent = 92;
-      energyFillEl.style.height = percent + "%";
-    }
-
-    async function fetchCityAndTemp(lat, lon) {
-      const now = Date.now();
-      if (now - weatherCooldown < 60000) return;
-      weatherCooldown = now;
-
-      try {
-        const weatherRes = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m`
-        );
-        const weatherData = await weatherRes.json();
-        if (weatherData && weatherData.current && typeof weatherData.current.temperature_2m !== "undefined") {
-          tempEl.textContent = `${Math.round(weatherData.current.temperature_2m)}°C`;
-        }
-      } catch (e) {}
-
-      if (!cityFetched) {
-        try {
-          const geoRes = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
-          );
-          const geoData = await geoRes.json();
-          const addr = geoData.address || {};
-          const city =
-            addr.city ||
-            addr.town ||
-            addr.village ||
-            addr.municipality ||
-            addr.county ||
-            "Ottawa";
-          cityEl.textContent = city;
-          cityFetched = true;
-        } catch (e) {
-          cityEl.textContent = "Ottawa";
-        }
-      }
-    }
-
-    function handlePosition(position) {
-      const lat = position.coords.latitude;
-      const lon = position.coords.longitude;
-      const accuracy = position.coords.accuracy || 9999;
-      const timestamp = position.timestamp || Date.now();
-
-      // Фильтр плохих GPS-скачков
-      if (accuracy > 60) {
-        return;
-      }
-
-      let speedKmh = 0;
-
-      if (lastLat !== null && lastLon !== null && lastTime !== null) {
-        const d = haversine(lastLat, lastLon, lat, lon);
-        const dt = (timestamp - lastTime) / 1000;
-
-        // Отсекаем нереальный мусор GPS
-        if (dt > 0 && d < 120) {
-          // Не добавляем микрошум GPS, если стоишь на месте
-          if (d >= 2) {
-            totalMeters += d;
-            try {
-              localStorage.setItem(DISTANCE_KEY, String(totalMeters));
-            } catch (e) {}
-          }
-
-          speedKmh = (d / dt) * 3.6;
-        }
-      }
-
-      // Если браузер дал реальную скорость — используем её
-      if (typeof position.coords.speed === "number" && !isNaN(position.coords.speed) && position.coords.speed >= 0) {
-        const gpsSpeed = position.coords.speed * 3.6;
-        if (gpsSpeed < 120) speedKmh = gpsSpeed;
-      }
-
-      if (speedKmh < 1) speedKmh = 0;
-
-      speedEl.textContent = Math.round(speedKmh);
-      renderEnergyBySpeed(speedKmh);
-      renderDistance();
-
-      lastLat = lat;
-      lastLon = lon;
-      lastTime = timestamp;
-
-      try {
-        localStorage.setItem(LAST_POS_KEY, JSON.stringify({
-          lat: lastLat,
-          lon: lastLon,
-          time: lastTime
-        }));
-      } catch (e) {}
-
-      fetchCityAndTemp(lat, lon);
-    }
-
-    function handleGeoError(err) {
-      cityEl.textContent = "GPS off";
-      tempEl.textContent = "--°C";
-      speedEl.textContent = "0";
-      renderEnergyBySpeed(0);
-    }
-
-    function startGPS() {
-      if (!navigator.geolocation) {
-        handleGeoError();
-        return;
-      }
-
-      navigator.geolocation.watchPosition(handlePosition, handleGeoError, {
-        enableHighAccuracy: true,
-        maximumAge: 0,
-        timeout: 15000
-      });
-    }
-
-    // если хочешь обнулить дистанцию вручную:
-    // localStorage.removeItem(DISTANCE_KEY);
-    // localStorage.removeItem(LAST_POS_KEY);
-
-    updateClock();
-    renderDistance();
-    renderEnergyBySpeed(0);
-    setInterval(updateClock, 1000);
-    startGPS();
-  </script>
 </body>
 </html>
